@@ -5,89 +5,67 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
+import asyncio
+import os
+import httpx
 
-# إعدادات البوت
-BOT_TOKEN   = "ضع_رمز_البوت_هنا"
-CHANNEL_ID  = "@dzmmm"  # تأكّد أن البوت مشرف بالقناة
-QARI_PATH   = "haytham"  # مسار القارئ في mp3quran.net
-QARI_NAME   = "هيثم الدخين"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = "@اسم_قناتك"  # بدون روابط، فقط اسم القناة
+QARI_NAME = "هيثم الدخين"
 
-# قائمة السور
+# قائمة بسور القرآن كاملة
 SURAH_LIST = [
-    "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال",
-    "التوبة", "يونس", "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف",
-    "مريم", "طه", "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل",
-    "القصص", "العنكبوت", "الروم", "لقمان", "السجدة", "الأحزاب", "سبأ", "فاطر", "يس", "الصافات",
-    "ص", "الزمر", "غافر", "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية", "الأحقاف", "محمد",
-    "الفتح", "الحجرات", "ق", "الذاريات", "الطور", "النجم", "القمر", "الرحمن", "الواقعة", "الحديد",
-    "المجادلة", "الحشر", "الممتحنة", "الصف", "الجمعة", "المنافقون", "التغابن", "الطلاق", "التحريم",
-    "الملك", "القلم", "الحاقة", "المعارج", "نوح", "الجن", "المزمل", "المدثر", "القيامة", "الإنسان",
-    "المرسلات", "النبأ", "النازعات", "عبس", "التكوير", "الانفطار", "المطففين", "الانشقاق",
-    "البروج", "الطارق", "الأعلى", "الغاشية", "الفجر", "البلد", "الشمس", "الليل", "الضحى",
-    "الشرح", "التين", "العلق", "القدر", "البينة", "الزلزلة", "العاديات", "القارعة", "التكاثر",
-    "العصر", "الهمزة", "الفيل", "قريش", "الماعون", "الكوثر", "الكافرون", "النصر", "المسد",
-    "الإخلاص", "الفلق", "الناس"
+    "001.mp3", "002.mp3", "003.mp3",  # وهكذا...
 ]
 
-# متغيرات الحالة
-is_running = True
-sent_count = 0
+SURAH_NAMES = [
+    "الفاتحة", "البقرة", "آل عمران",  # وهكذا...
+]
 
-# إعداد اللوق
-logging.basicConfig(level=logging.INFO)
+async def send_random_surah(app):
+    while True:
+        index = random.randint(0, len(SURAH_LIST) - 1)
+        surah_file = SURAH_LIST[index]
+        surah_name = SURAH_NAMES[index]
 
-# إرسال سورة عشوائية كل 5 دقائق
-async def send_random_surah(context: ContextTypes.DEFAULT_TYPE):
-    global sent_count, is_running
-    if not is_running:
-        return
+        url = f"https://server8.mp3quran.net/haitham/{surah_file}"
+        caption = f"📖 {surah_name}\n🎙️ {QARI_NAME}"
 
-    index = random.randint(0, 113)
-    surah_name = SURAH_LIST[index]
-    surah_num  = str(index + 1).zfill(3)
-    url = f"https://server6.mp3quran.net/{QARI_PATH}/{surah_num}.mp3"
-    caption = f"📖 {surah_name}\n🎙️ {QARI_NAME}"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                await app.bot.send_audio(chat_id=CHANNEL_ID, audio=url, caption=caption)
+        
+        await asyncio.sleep(300)  # كل 5 دقائق
 
-    try:
-        await context.bot.send_audio(
-            chat_id=CHANNEL_ID,
-            audio=url,
-            caption=caption
-        )
-        sent_count += 1
-    except Exception as e:
-        logging.error(f"فشل الإرسال: {e}")
-
-# أوامر البوت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 أهلاً! هذا بوت سور القرآن الكريم بصوت هيثم الدخين.")
+    await update.message.reply_text("مرحبًا! أنا بوت قرآن هيثم الدخين. أرسل /random لإرسال سورة الآن.")
 
-async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    index = random.randint(0, 113)
-    surah_name = SURAH_LIST[index]
-    surah_num = str(index + 1).zfill(3)
-    url = f"https://server6.mp3quran.net/{QARI_PATH}/{surah_num}.mp3"
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ البوت يعمل الآن.")
+
+async def random_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    index = random.randint(0, len(SURAH_LIST) - 1)
+    surah_file = SURAH_LIST[index]
+    surah_name = SURAH_NAMES[index]
+    url = f"https://server8.mp3quran.net/haitham/{surah_file}"
     caption = f"📖 {surah_name}\n🎙️ {QARI_NAME}"
     await update.message.reply_audio(audio=url, caption=caption)
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    state = "✅ يعمل" if is_running else "⏸️ متوقف"
-    await update.message.reply_text(f"حالة البوت: {state}")
-
-# نقطة التشغيل
-def main():
+async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # أوامر المستخدم
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("now", now))
     app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("random", random_surah))
 
-    # جدولة إرسال السور
-    app.job_queue.run_repeating(send_random_surah, interval=300, first=0)
+    # ابدأ المهمة الخلفية للإرسال كل 5 دقائق
+    asyncio.create_task(send_random_surah(app))
 
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
